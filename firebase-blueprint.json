@@ -1,0 +1,53 @@
+{
+  "entities": {
+    "vehicles": {
+      "title": "Vehicles",
+      "description": "Registered drivers and vehicle listings in MyTirri",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "driverName": { "type": "string" },
+        "phone": { "type": "string" },
+        "whatsappNumber": { "type": "string" },
+        "vehicleNumber": { "type": "string" },
+        "category": { "type": "string" },
+        "captainType": { "type": "string" },
+        "city": { "type": "string" },
+        "mohalla": { "type": "string" },
+        "priceRate": { "type": "string" },
+        "rating": { "type": "number" },
+        "reviewCount": { "type": "number" },
+        "isVerified": { "type": "boolean" },
+        "isFounderCaptain": { "type": "boolean" },
+        "availableStatus": { "type": "string" },
+        "driverPhoto": { "type": "string" },
+        "vehiclePhoto": { "type": "string" },
+        "description": { "type": "string" },
+        "acceptedPayments": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["driverName", "phone", "vehicleNumber", "category", "city", "mohalla"]
+    },
+    "contact_history": {
+      "title": "Contact History",
+      "description": "Passenger contact logs with drivers",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "vehicleId": { "type": "string" },
+        "driverName": { "type": "string" },
+        "category": { "type": "string" },
+        "phone": { "type": "string" },
+        "mohalla": { "type": "string" },
+        "city": { "type": "string" },
+        "actionType": { "type": "string" },
+        "date": { "type": "string" },
+        "timestamp": { "type": "number" }
+      },
+      "required": ["vehicleId", "driverName", "actionType"]
+    }
+  }
+}
