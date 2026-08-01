@@ -1,0 +1,6 @@
+{
+  "name": "MyTirri - Har Safar Ka Saathi",
+  "description": "Local transport discovery platform connecting passengers with nearby vehicle owners across Tier-2 and Tier-3 towns.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

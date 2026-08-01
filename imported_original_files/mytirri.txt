@@ -1,0 +1,102 @@
+MyTirri – Har Safar Ka Saathi
+Version: MVP v1
+Prepared For: Project Discussion
+1. Vision
+MyTirri is a local transport discovery platform connecting passengers with nearby
+vehicle owners. The first version focuses on discovery, contact, and trust rather than
+online booking.
+2. Goals
+• Easy search of local transport.
+• City and Mohalla based listings.
+• Free registration for Captains.
+• Simple interface for local users.
+• Build a trusted local transport directory.
+3. User Types
+Captain – Driver or Vehicle Owner.
+User – Customer searching for transport.
+4. App Flow
+Page 1: Language Selection (Hindi / English / Urdu)
+Page 2: Choose Role (Become a Captain / Continue as User)
+5. Captain Flow
+1. Mobile OTP Registration
+2. Add Vehicle
+3. Choose Individual or Agency
+4. Dashboard
+Add Vehicle Fields
+Driver Photo, Vehicle Photo, Name, Mobile, City, Mohalla, Vehicle Category, Vehicle
+Number, Payment Methods, Description.
+Captain Dashboard
+• Total Views
+• Search Appearances
+• Phone Clicks
+• Edit Vehicle
+• Add More Vehicle
+Captain Menu
+Profile
+Your Vehicles
+About
+Profile Badge: Founder Captain (available to early registered drivers).
+6. User Flow
+1. Mobile OTP Registration
+2. Dashboard
+3. Select Category
+4. Vehicle List (OLX style)
+5. Vehicle Details
+User Menu
+Profile
+View History
+About
+7. Vehicle Categories
+Cab
+E-Rickshaw
+Bike
+Reda
+Bike Reda
+Chhota Hathi / ACE
+Tata 407/408
+Bus
+Tractor Trolley
+Heavy Vehicle
+8. Vehicle Listing Design
+Each listing displays:
+Vehicle Photo
+Driver Name
+City
+Mohalla
+Rating
+Accepted Payments
+Call Button
+WhatsApp Button
+9. Filters
+City
+Mohalla
+Vehicle Type
+Verified Drivers
+Rating
+Payment Method
+10. Payment Methods
+Drivers choose supported methods:
+• Cash
+• UPI
+• Card
+11. Profile Badges
+Founder Captain
+Verified Captain (Future)
+Top Rated Captain (Future)
+12. Future Roadmap
+Phase 2: GPS, Ride Requests, Reviews, Notifications.
+Phase 3: Online Booking, Live Tracking, Digital Payments, Subscription Plans, Admin
+Analytics.
+13. Monetization
+Premium Listings
+Verified Badge Subscription
+Agency Plans
+Sponsored Listings
+Advertising
+14. Why MyTirri?
+Unlike large ride-hailing apps, MyTirri focuses on local transport availability. Users can
+easily find nearby drivers based on city and mohalla, making it especially useful in
+Tier-2 and Tier-3 towns where local transport is fragmented.
+15. MVP Summary
+Launch only with: • Language Selection • OTP Login • Captain/User Registration • Add
+Vehicle • Search & Filters • Dashboard • Profile
