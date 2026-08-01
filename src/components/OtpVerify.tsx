@@ -1,12 +1,21 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useApp } from '../context/AppContext';
-import { ShieldCheck, ArrowRight, RefreshCw, Sparkles } from 'lucide-react';
+import { ShieldCheck, ArrowRight, RefreshCw, Loader2, Phone } from 'lucide-react';
 
 export const OtpVerify: React.FC = () => {
-  const { phoneNumber, role, navigateTo, t } = useApp();
-  const [otp, setOtp] = useState(['1', '2', '3', '4', '5', '6']);
+  const { phoneNumber, role, verifyOtp, sendOtp, navigateTo, t, isDemoOtpMode } = useApp();
+  const [otp, setOtp] = useState(isDemoOtpMode ? ['1', '2', '3', '4', '5', '6'] : ['', '', '', '', '', '']);
   const [timer, setTimer] = useState(30);
+  const [loading, setLoading] = useState(false);
+  const [resending, setResending] = useState(false);
+  const [error, setError] = useState('');
+  const [resendMsg, setResendMsg] = useState('');
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
+
+  useEffect(() => {
+    // Auto-focus first input
+    inputRefs.current[0]?.focus();
+  }, []);
 
   useEffect(() => {
     if (timer > 0) {
@@ -20,6 +29,7 @@ export const OtpVerify: React.FC = () => {
     const newOtp = [...otp];
     newOtp[index] = value.slice(-1);
     setOtp(newOtp);
+    if (error) setError('');
 
     if (value && index < 5) {
       inputRefs.current[index + 1]?.focus();
@@ -32,19 +42,76 @@ export const OtpVerify: React.FC = () => {
     }
   };
 
-  const handleVerify = (e: React.FormEvent) => {
+  const handlePaste = (e: React.ClipboardEvent<HTMLInputElement>) => {
     e.preventDefault();
-    if (otp.join('').length < 6) return;
+    const pasteData = e.clipboardData.getData('text').trim().replace(/\D/g, '').slice(0, 6);
+    if (pasteData) {
+      const newOtp = pasteData.split('').concat(Array(6 - pasteData.length).fill(''));
+      setOtp(newOtp);
+      const nextFocus = Math.min(pasteData.length, 5);
+      inputRefs.current[nextFocus]?.focus();
+    }
+  };
 
-    if (role === 'captain') {
-      navigateTo('captain_type');
+  const handleResend = async () => {
+    if (timer > 0 || resending) return;
+    setResending(true);
+    setError('');
+    setResendMsg('');
+    const res = await sendOtp(phoneNumber, 'recaptcha-resend-container');
+    setResending(false);
+    if (res.success) {
+      setTimer(60);
+      setResendMsg('New SMS OTP sent successfully!');
     } else {
-      navigateTo('user_dashboard');
+      setError(res.error || 'Failed to resend SMS OTP.');
+    }
+  };
+
+  const handleVerify = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const fullOtp = otp.join('');
+    if (fullOtp.length < 6) {
+      setError('Please enter the full 6-digit code sent to your phone');
+      return;
+    }
+
+    setLoading(true);
+    setError('');
+
+    try {
+      const res = await verifyOtp(fullOtp);
+      if (res.success) {
+        if (role === 'captain') {
+          navigateTo('captain_type');
+        } else {
+          navigateTo('user_dashboard');
+        }
+      } else {
+        setError(res.error || 'Verification failed. Please check the 6-digit code.');
+      }
+    } catch (err: any) {
+      setError('Verification error: ' + (err.message || 'Unknown error'));
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
     <div className="p-4 max-w-md mx-auto space-y-6">
+      <div id="recaptcha-resend-container"></div>
+
+      {isDemoOtpMode && (
+        <div className="bg-amber-50 border border-amber-200 rounded-2xl p-3.5 text-xs text-amber-900 leading-relaxed shadow-xs">
+          <p className="font-bold flex items-center gap-1.5 text-amber-800">
+            <span>ℹ️</span> Firebase Phone Provider Notice
+          </p>
+          <p className="mt-1 text-amber-700">
+            Phone Auth is disabled in Firebase Console (Authentication &gt; Sign-in method &gt; Phone). Fallback code <strong className="font-extrabold text-amber-900 bg-amber-100 px-1.5 py-0.5 rounded">123456</strong> has been auto-filled for testing.
+          </p>
+        </div>
+      )}
+
       <div className="text-center space-y-2 mt-4">
         <div className="w-16 h-16 bg-blue-100 text-blue-700 rounded-3xl mx-auto flex items-center justify-center shadow-inner">
           <ShieldCheck className="w-8 h-8" />
@@ -54,6 +121,13 @@ export const OtpVerify: React.FC = () => {
           {t('verifyOtpSub')}{' '}
           <span className="font-bold text-slate-900">+91 {phoneNumber}</span>
         </p>
+        <button
+          type="button"
+          onClick={() => navigateTo('otp_phone')}
+          className="text-xs font-semibold text-blue-700 hover:underline inline-flex items-center gap-1"
+        >
+          <Phone className="w-3 h-3" /> Change Number
+        </button>
       </div>
 
       <form onSubmit={handleVerify} className="space-y-6">
@@ -63,43 +137,71 @@ export const OtpVerify: React.FC = () => {
               key={idx}
               ref={(el) => { inputRefs.current[idx] = el; }}
               type="text"
+              inputMode="numeric"
               maxLength={1}
+              disabled={loading}
               value={digit}
               onChange={(e) => handleChange(idx, e.target.value)}
               onKeyDown={(e) => handleKeyDown(idx, e)}
-              className="w-12 h-14 text-center font-black text-xl text-slate-900 bg-white border-2 border-slate-200 focus:border-blue-600 rounded-xl shadow-xs focus:outline-hidden transition-all"
+              onPaste={handlePaste}
+              className="w-12 h-14 text-center font-black text-xl text-slate-900 bg-white border-2 border-slate-200 focus:border-blue-600 rounded-xl shadow-xs focus:outline-hidden transition-all disabled:bg-slate-50"
             />
           ))}
         </div>
 
+        {error && (
+          <p className="text-xs font-semibold text-rose-600 text-center leading-relaxed bg-rose-50 p-2.5 rounded-xl border border-rose-200">
+            {error}
+          </p>
+        )}
+
+        {resendMsg && (
+          <p className="text-xs font-semibold text-emerald-700 text-center bg-emerald-50 p-2 rounded-lg border border-emerald-200">
+            {resendMsg}
+          </p>
+        )}
+
         <div className="flex items-center justify-between text-xs">
-          <div className="flex items-center gap-1.5 text-blue-700 font-semibold bg-blue-50 px-3 py-1.5 rounded-lg">
-            <Sparkles className="w-3.5 h-3.5" />
-            <span>Demo Auto-filled: 123456</span>
-          </div>
+          <span className="text-slate-500 font-medium">SMS Sent via Firebase</span>
 
           {timer > 0 ? (
             <span className="text-slate-500 font-medium">Resend in {timer}s</span>
           ) : (
             <button
               type="button"
-              onClick={() => setTimer(30)}
-              className="text-blue-700 font-bold hover:underline flex items-center gap-1"
+              disabled={resending}
+              onClick={handleResend}
+              className="text-blue-700 font-bold hover:underline flex items-center gap-1 disabled:opacity-50"
             >
-              <RefreshCw className="w-3.5 h-3.5" />
-              Resend OTP
+              {resending ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              ) : (
+                <RefreshCw className="w-3.5 h-3.5" />
+              )}
+              <span>Resend OTP</span>
             </button>
           )}
         </div>
 
         <button
           type="submit"
-          className="w-full py-4 bg-gradient-to-r from-blue-700 to-indigo-600 hover:from-blue-800 hover:to-indigo-700 text-white font-bold text-base rounded-2xl shadow-lg shadow-blue-600/25 flex items-center justify-center gap-2 active:scale-[0.99] transition-all"
+          disabled={loading || otp.join('').length < 6}
+          className="w-full py-4 bg-gradient-to-r from-blue-700 to-indigo-600 hover:from-blue-800 hover:to-indigo-700 text-white font-bold text-base rounded-2xl shadow-lg shadow-blue-600/25 flex items-center justify-center gap-2 active:scale-[0.99] transition-all disabled:opacity-60"
         >
-          <span>{t('verifyBtn')}</span>
-          <ArrowRight className="w-5 h-5" />
+          {loading ? (
+            <>
+              <Loader2 className="w-5 h-5 animate-spin" />
+              <span>Verifying Code...</span>
+            </>
+          ) : (
+            <>
+              <span>{t('verifyBtn')}</span>
+              <ArrowRight className="w-5 h-5" />
+            </>
+          )}
         </button>
       </form>
     </div>
   );
 };
+

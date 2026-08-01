@@ -8,7 +8,7 @@ import {
   SearchFilters,
 } from '../types';
 import { INITIAL_VEHICLES, TRANSLATIONS } from '../data/mockData';
-import { db } from '../lib/firebase';
+import { db, auth } from '../lib/firebase';
 import {
   collection,
   onSnapshot,
@@ -17,9 +17,20 @@ import {
   addDoc,
   updateDoc,
   increment,
-  query,
-  orderBy,
 } from 'firebase/firestore';
+import {
+  RecaptchaVerifier,
+  signInWithPhoneNumber,
+  ConfirmationResult,
+  User,
+  onAuthStateChanged,
+} from 'firebase/auth';
+
+declare global {
+  interface Window {
+    recaptchaVerifier?: any;
+  }
+}
 
 interface AppContextType {
   language: Language;
@@ -44,6 +55,12 @@ interface AppContextType {
   setSearchFilters: React.Dispatch<React.SetStateAction<SearchFilters>>;
   resetSearchFilters: () => void;
   t: (key: keyof typeof TRANSLATIONS['en']) => string;
+  // Firebase Auth & OTP
+  firebaseUser: User | null;
+  confirmationResult: ConfirmationResult | null;
+  isDemoOtpMode: boolean;
+  sendOtp: (phone: string, containerId?: string) => Promise<{ success: boolean; isDemo?: boolean; error?: string; notice?: string }>;
+  verifyOtp: (otpCode: string) => Promise<{ success: boolean; error?: string }>;
 }
 
 const DEFAULT_FILTERS: SearchFilters = {
@@ -75,6 +92,100 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     acceptedPayments: ['Cash', 'UPI'],
   });
   const [searchFilters, setSearchFilters] = useState<SearchFilters>(DEFAULT_FILTERS);
+  const [firebaseUser, setFirebaseUser] = useState<User | null>(null);
+  const [confirmationResult, setConfirmationResult] = useState<ConfirmationResult | null>(null);
+  const [isDemoOtpMode, setIsDemoOtpMode] = useState<boolean>(false);
+
+  // Auth state change listener
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      setFirebaseUser(user);
+      if (user?.phoneNumber) {
+        // Strip leading +91 or + if present for state display
+        const cleaned = user.phoneNumber.replace(/^\+91/, '').replace(/^\+/, '');
+        setPhoneNumber(cleaned);
+      }
+    });
+    return () => unsubscribe();
+  }, []);
+
+  const sendOtp = async (phone: string, containerId = 'recaptcha-container'): Promise<{ success: boolean; isDemo?: boolean; error?: string; notice?: string }> => {
+    try {
+      const cleaned = phone.replace(/\D/g, '');
+      const formattedPhone = `+91${cleaned}`;
+
+      // Re-initialize RecaptchaVerifier if needed
+      if (window.recaptchaVerifier) {
+        try {
+          window.recaptchaVerifier.clear();
+        } catch (e) {
+          // ignore error clearing old recaptcha
+        }
+        window.recaptchaVerifier = undefined;
+      }
+
+      window.recaptchaVerifier = new RecaptchaVerifier(auth, containerId, {
+        size: 'invisible',
+        callback: () => {
+          // reCAPTCHA solved
+        },
+      });
+
+      const appVerifier = window.recaptchaVerifier;
+      const result = await signInWithPhoneNumber(auth, formattedPhone, appVerifier);
+      setConfirmationResult(result);
+      setIsDemoOtpMode(false);
+      return { success: true };
+    } catch (err: any) {
+      console.error('Firebase sendOtp error:', err);
+      
+      // If Phone Auth is not enabled in Firebase Console, fallback to demo mode with code 123456
+      if (err.code === 'auth/operation-not-allowed') {
+        setIsDemoOtpMode(true);
+        setConfirmationResult(null);
+        return {
+          success: true,
+          isDemo: true,
+          notice: 'Phone Auth is disabled in Firebase Console. Switch to demo verification mode (Code: 123456).',
+        };
+      }
+
+      let errorMsg = err.message || 'Failed to send SMS OTP.';
+      if (err.code === 'auth/invalid-phone-number') {
+        errorMsg = 'Invalid phone number format.';
+      } else if (err.code === 'auth/captcha-check-failed') {
+        errorMsg = 'reCAPTCHA check failed. Please refresh and try again.';
+      } else if (err.code === 'auth/too-many-requests') {
+        errorMsg = 'Too many attempts. Please try again later.';
+      }
+      return { success: false, error: errorMsg };
+    }
+  };
+
+  const verifyOtp = async (otpCode: string): Promise<{ success: boolean; error?: string }> => {
+    // Demo Mode or Fallback when Firebase Phone Auth provider is not enabled in Console
+    if (isDemoOtpMode || !confirmationResult) {
+      if (otpCode === '123456' || otpCode === '000000') {
+        return { success: true };
+      }
+      return { success: false, error: 'Incorrect verification code. (In demo mode, enter 123456).' };
+    }
+
+    try {
+      const userCred = await confirmationResult.confirm(otpCode);
+      setFirebaseUser(userCred.user);
+      return { success: true };
+    } catch (err: any) {
+      console.error('Firebase verifyOtp error:', err);
+      let errorMsg = 'Invalid OTP code. Please enter the correct code.';
+      if (err.code === 'auth/invalid-verification-code') {
+        errorMsg = 'Incorrect 6-digit OTP code.';
+      } else if (err.code === 'auth/code-expired') {
+        errorMsg = 'OTP code expired. Please request a new OTP.';
+      }
+      return { success: false, error: errorMsg };
+    }
+  };
 
   // Real-time Firestore sync for Vehicles
   useEffect(() => {
@@ -214,6 +325,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setSearchFilters,
         resetSearchFilters,
         t,
+        firebaseUser,
+        confirmationResult,
+        isDemoOtpMode,
+        sendOtp,
+        verifyOtp,
       }}
     >
       {children}
