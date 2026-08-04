@@ -110,10 +110,25 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, []);
 
   const sendOtp = async (phone: string, containerId = 'recaptcha-container'): Promise<{ success: boolean; isDemo?: boolean; error?: string; notice?: string }> => {
-    try {
-      const cleaned = phone.replace(/\D/g, '');
-      const formattedPhone = `+91${cleaned}`;
+    const cleaned = phone.replace(/\D/g, '');
+    const formattedPhone = `+91${cleaned}`;
 
+    // First try local Node.js Express backend API
+    try {
+      const backendRes = await fetch('/api/auth/send-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone: cleaned }),
+      });
+      if (backendRes.ok) {
+        const data = await backendRes.json();
+        console.log('[Node Backend API Response]', data);
+      }
+    } catch (e) {
+      console.warn('[Node Backend API unreachable, falling back to Firebase]', e);
+    }
+
+    try {
       // Re-initialize RecaptchaVerifier if needed
       if (window.recaptchaVerifier) {
         try {
@@ -139,14 +154,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     } catch (err: any) {
       console.error('Firebase sendOtp error:', err);
       
-      // If Phone Auth is not enabled in Firebase Console, fallback to demo mode with code 123456
-      if (err.code === 'auth/operation-not-allowed') {
+      // If Phone Auth is not enabled in Firebase Console or running offline, fallback to Node.js backend offline OTP
+      if (err.code === 'auth/operation-not-allowed' || err.code === 'auth/network-request-failed') {
         setIsDemoOtpMode(true);
         setConfirmationResult(null);
         return {
           success: true,
           isDemo: true,
-          notice: 'Phone Auth is disabled in Firebase Console. Switch to demo verification mode (Code: 123456).',
+          notice: 'Offline Node.js Express backend mode activated. Use OTP code 123456.',
         };
       }
 
@@ -163,12 +178,29 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const verifyOtp = async (otpCode: string): Promise<{ success: boolean; error?: string }> => {
+    // Try Node.js Express Backend API first
+    try {
+      const backendRes = await fetch('/api/auth/verify-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone: phoneNumber, otpCode }),
+      });
+      if (backendRes.ok) {
+        const data = await backendRes.json();
+        if (data.success) {
+          return { success: true };
+        }
+      }
+    } catch (e) {
+      console.warn('[Node Backend verify failed, checking Firebase / fallback]', e);
+    }
+
     // Demo Mode or Fallback when Firebase Phone Auth provider is not enabled in Console
     if (isDemoOtpMode || !confirmationResult) {
       if (otpCode === '123456' || otpCode === '000000') {
         return { success: true };
       }
-      return { success: false, error: 'Incorrect verification code. (In demo mode, enter 123456).' };
+      return { success: false, error: 'Incorrect verification code. Enter 123456 for offline testing.' };
     }
 
     try {
